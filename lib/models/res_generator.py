@@ -1,6 +1,5 @@
 import torch.nn as nn
 from torch import Tensor
-import torch.nn.functional as F
 
 from lib.layers import ConvNormRelu, ResBlock
 
@@ -15,8 +14,8 @@ class ResGenerator(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        n_filters: int,
-        norm_layer: nn,
+        ng_filters: int = 64,
+        norm_layer: nn = nn.BatchNorm2d,
         n_blocks: int = 6,
         padding_mode: str = "reflect",
     ):
@@ -24,20 +23,21 @@ class ResGenerator(nn.Module):
 
         Parameters:
         -----------
-            in_channels: the number of channels in input images
-            out_channels: the number of channels in output images
-            n_filters: the number of filters in the last conv layer
-            norm_layer: normalization layer
-            n_blocks: the number of ResNet blocks
-            padding_type: the name of padding layer in conv layers
-                          `reflect` | `replicate` | `zeros`
+            in_channels:    the number of channels in input images
+            out_channels:   the number of channels in output images
+            ng_filters:     the number of filters in the last conv layer
+            norm_layer:     normalization layer
+            n_blocks:       the number of ResNet blocks
+            padding_type:   the name of padding layer in conv layers
+                            `reflect` | `replicate` | `zeros`
         """
         assert n_blocks >= 0
         super(ResGenerator, self).__init__()
+        # No need to use bias as BatchNorm2d has affine parameters
         use_bias = norm_layer == nn.InstanceNorm2d
         self.conv_norm_relu = ConvNormRelu(
             in_channels,
-            n_filters,
+            ng_filters,
             conv_type="forward",
             norm_layer=norm_layer,
             use_bias=use_bias,
@@ -49,8 +49,8 @@ class ResGenerator(nn.Module):
             mult = 2 ** i
             encoder += [
                 ConvNormRelu(
-                    n_filters * mult,
-                    n_filters * mult * 2,
+                    ng_filters * mult,
+                    ng_filters * mult * 2,
                     conv_type="forward",
                     norm_layer=norm_layer,
                     kernel_size=3,
@@ -65,7 +65,7 @@ class ResGenerator(nn.Module):
         resblocks = []
         for i in range(n_blocks):
             resblocks += [
-                ResBlock(n_filters * mult, padding_mode, norm_layer, use_bias)
+                ResBlock(ng_filters * mult, padding_mode, norm_layer, use_bias)
             ]
         self.transform = nn.Sequential(*resblocks)
         # DECODING
@@ -74,8 +74,8 @@ class ResGenerator(nn.Module):
             mult = 2 ** (n_downsampling - i)
             decoder += [
                 ConvNormRelu(
-                    n_filters * mult,
-                    int(n_filters * mult / 2),
+                    ng_filters * mult,
+                    int(ng_filters * mult / 2),
                     conv_type="transpose",
                     norm_layer=norm_layer,
                     kernel_size=3,
@@ -86,7 +86,7 @@ class ResGenerator(nn.Module):
             ]
         decoder += [
             nn.Conv2d(
-                n_filters,
+                ng_filters,
                 out_channels,
                 kernel_size=7,
                 padding=3,

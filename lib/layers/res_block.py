@@ -11,8 +11,8 @@ class ResBlock(nn.Module):
         dim: int,
         padding_mode: str,
         norm_layer: nn,
-        use_bias: bool = False,
-        leaky: bool = False,
+        use_bias: bool = True,
+        leaky: float = 0,
     ):
         """Initialize the Resnet block
 
@@ -45,8 +45,8 @@ class ResBlock(nn.Module):
                 dim, dim, kernel_size=3, padding=1, padding_mode="zeros", bias=use_bias
             )
         self.norm = norm_layer(dim)
-        if leaky:
-            self.relu = nn.LeakyReLU(negative_slope=0.2)
+        if leaky > 0:
+            self.relu = nn.LeakyReLU(negative_slope=leaky)
         else:
             self.relu = nn.ReLU()
 
