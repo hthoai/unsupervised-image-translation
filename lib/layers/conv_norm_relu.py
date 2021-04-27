@@ -1,6 +1,8 @@
 import torch.nn as nn
 from torch import Tensor
 
+from utils.get_norm_layer import get_norm_layer
+
 
 class ConvNormRelu(nn.Module):
     """Do convolution, normalize, (leaky) relu activation."""
@@ -10,7 +12,7 @@ class ConvNormRelu(nn.Module):
         in_channels: int,
         out_channels: int,
         conv_type: str,
-        norm_layer: nn,
+        norm_type: str,
         kernel_size: int = 3,
         stride: int = 1,
         pad_size: int = 0,
@@ -41,7 +43,7 @@ class ConvNormRelu(nn.Module):
         else:
             raise NotImplementedError(f"conv_type {conv_type} is not implemented.")
         # Normalize
-        self.norm = norm_layer(out_channels)
+        self.norm = get_norm_layer(norm_type)(out_channels)
         # (Leaky) Relu
         if leaky > 0:
             self.relu = nn.LeakyReLU(negative_slope=leaky)

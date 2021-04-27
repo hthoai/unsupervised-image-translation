@@ -1,6 +1,8 @@
 import torch.nn as nn
 from torch import Tensor
 
+from utils.get_norm_layer import get_norm_layer
+
 
 class ResidualBlock(nn.Module):
     """Define a Residual block"""
@@ -8,7 +10,7 @@ class ResidualBlock(nn.Module):
     def __init__(
         self,
         dim: int,
-        norm_layer: nn,
+        norm_type: str,
         use_bias: bool = True,
         leaky: float = 0,
     ) -> None:
@@ -25,7 +27,7 @@ class ResidualBlock(nn.Module):
             padding_mode="reflect",
             bias=use_bias,
         )
-        self.norm = norm_layer(dim)
+        self.norm = get_norm_layer(norm_type)(dim)
         if leaky > 0:
             self.relu = nn.LeakyReLU(negative_slope=leaky)
         else:

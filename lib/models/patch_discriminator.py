@@ -11,7 +11,7 @@ class PatchDiscriminator(nn.Module):
         nc: int,
         ndf: int = 64,
         nd_layers: int = 3,
-        norm_layer: nn = nn.BatchNorm2d,
+        norm_type: str="batch",
     ) -> None:
         """Construct a PatchGAN discriminator.
 
@@ -20,11 +20,11 @@ class PatchDiscriminator(nn.Module):
             nc:         the number of channels in output images
             ndf:        size of feature maps in discriminator
             n_layers:   the number of conv layers in the discriminator
-            norm_layer: normalization layer
+            norm_type:  normalization layer `batch` | `instance`
         """
         super(PatchDiscriminator, self).__init__()
         # No need to use bias as BatchNorm2d has affine parameters
-        use_bias = norm_layer == nn.InstanceNorm2d
+        use_bias = norm_type == "instance"
         kw = 4
         padw = 1
         self.conv1 = nn.Conv2d(nc, ndf, kernel_size=kw, stride=2, padding=padw)
@@ -41,7 +41,7 @@ class PatchDiscriminator(nn.Module):
                     ndf * nf_mult_prev,
                     ndf * nf_mult,
                     conv_type="forward",
-                    norm_layer=norm_layer,
+                    norm_type=norm_type,
                     kernel_size=kw,
                     stride=2,
                     pad_size=padw,
@@ -56,7 +56,7 @@ class PatchDiscriminator(nn.Module):
             ndf * nf_mult_prev,
             ndf * nf_mult,
             conv_type="forward",
-            norm_layer=norm_layer,
+            norm_type=norm_type,
             kernel_size=kw,
             stride=1,
             pad_size=padw,

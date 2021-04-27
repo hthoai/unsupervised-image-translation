@@ -15,7 +15,7 @@ class ResidualGenerator(nn.Module):
         nz: int,
         nc: int,
         ngf: int = 64,
-        norm_layer: nn = nn.BatchNorm2d,
+        norm_type: str="batch",
         ng_blocks: int = 6,
     ) -> None:
         """Construct a Resnet-based Generator.
@@ -25,13 +25,13 @@ class ResidualGenerator(nn.Module):
             nz:          size of z latent vector
             nc:          the number of channels in output images
             ngf:         size of feature maps in generator
-            norm_layer:  normalization layer
+            norm_type:   normalization layer `batch` | `instance`
             n_blocks:    the number of Residual blocks
         """
         assert (ng_blocks >= 0)
         super(ResidualGenerator, self).__init__()
         # No need to use bias as BatchNorm2d has affine parameters
-        use_bias = norm_layer == nn.InstanceNorm2d
+        use_bias = norm_type == "batch"
         # ENCODING
         encoder = [nn.ReflectionPad2d(3)]
         encoder += [
@@ -39,7 +39,7 @@ class ResidualGenerator(nn.Module):
                 nz,
                 ngf,
                 conv_type="forward",
-                norm_layer=norm_layer,
+                norm_type=norm_type,
                 kernel_size=7,
                 use_bias=use_bias,
             )
@@ -52,7 +52,7 @@ class ResidualGenerator(nn.Module):
                     ngf * mult,
                     ngf * mult * 2,
                     conv_type="forward",
-                    norm_layer=norm_layer,
+                    norm_type=norm_type,
                     kernel_size=3,
                     stride=2,
                     pad_size=1,
@@ -64,7 +64,7 @@ class ResidualGenerator(nn.Module):
         mult = 2 ** n_downsampling
         resblocks = []
         for i in range(ng_blocks):
-            resblocks += [ResidualBlock(ngf * mult, norm_layer, use_bias)]
+            resblocks += [ResidualBlock(ngf * mult, norm_type, use_bias)]
         self.transform = nn.Sequential(*resblocks)
         # DECODING
         decoder = []
@@ -75,7 +75,7 @@ class ResidualGenerator(nn.Module):
                     ngf * mult,
                     int(ngf * mult / 2),
                     conv_type="transpose",
-                    norm_layer=norm_layer,
+                    norm_type=norm_type,
                     kernel_size=3,
                     stride=2,
                     pad_size=1,
