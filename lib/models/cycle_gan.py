@@ -96,14 +96,14 @@ class CycleGAN(nn.Module):
         loss_cycle_A = self.cycle_criterion(rec_A, real_A) * self.lambda_A
         loss_cycle_B = self.cycle_criterion(rec_B, real_B) * self.lambda_B
         ## 3a) Reconciliation
-        same_A = self.G_AB(real_A)
-        same_B = self.G_BA(real_B)
+        rec_A = self.G_AB(real_A)
+        rec_B = self.G_BA(real_B)
         ## 3b) Loss identity
         loss_idt_A = (
-            self.idt_criterion(real_A, same_A) * self.lambda_A * self.lambda_identity
+            self.idt_criterion(real_A, rec_A) * self.lambda_A * self.lambda_identity
         )
         loss_idt_B = (
-            self.idt_criterion(real_B, same_B) * self.lambda_B * self.lambda_identity
+            self.idt_criterion(real_B, rec_B) * self.lambda_B * self.lambda_identity
         )
         ## 4 Combine losses and calculate grads
         loss_G = (
@@ -140,14 +140,20 @@ class CycleGAN(nn.Module):
         ## 5 Update Ds' weights
         self.optimizers[1].step()
 
+        # Save for logging
+        domain_A = {"real": real_A, "fake": fake_A, "rec": rec_A}
+        domain_B = {"real": real_B, "fake": fake_B, "rec": rec_B}
+
+        
+
         losses = {
-            "loss_G": loss_G,
-            "loss_D": loss_D,
-            "loss_cycle": loss_cycle_A + loss_cycle_B,
-            "loss_idt": loss_idt_A + loss_idt_B,
+            "G": loss_G,
+            "D": loss_D,
+            "cycle": loss_cycle_A + loss_cycle_B,
+            "idt": loss_idt_A + loss_idt_B,
         }
 
-        return losses
+        return losses, domain_A, domain_B
 
     def set_optims_and_schedulers(self, cfgs: Any, starting_epoch: int) -> None:
         # Set optimizers
