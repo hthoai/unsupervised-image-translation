@@ -11,7 +11,7 @@ class ReplayBuffer:
         self.max_size = max_size
         self.buffer = []
     
-    def query(self, images):
+    def __call__(self, images):
         # If the buffer size is 0, do nothing
         if self.max_size == 0:
             return images
@@ -20,8 +20,7 @@ class ReplayBuffer:
             image = torch.unsqueeze(image.data, 0)
             # If the buffer is not full,
             # keep inserting current images to the buffer
-            if self.num_imgs < self.pool_size:   
-                self.num_imgs = self.num_imgs + 1
+            if len(self.buffer) < self.max_size:
                 self.buffer.append(image)
                 return_images.append(image)
             else:
@@ -29,7 +28,7 @@ class ReplayBuffer:
                 # The buffer will return a previously stored image,
                 # and insert the current image into the buffer
                 if p > 0.5:  
-                    random_id = random.randint(0, self.pool_size - 1)
+                    random_id = random.randint(0, self.max_size - 1)
                     tmp = self.buffer[random_id].clone()
                     self.buffer[random_id] = image
                     return_images.append(tmp)
