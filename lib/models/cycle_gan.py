@@ -7,6 +7,7 @@ import torch.nn as nn
 
 from utils.replay_buffer import ReplayBuffer
 from utils.lambda_lr import LambdaLR
+from utils.init_weight import init_weights
 from lib.models import ResidualGenerator, PatchDiscriminator
 
 
@@ -44,10 +45,14 @@ class CycleGAN(nn.Module):
         super(CycleGAN, self).__init__()
         # Generators
         self.G_AB = ResidualGenerator(nz, nc, ngf, norm_type, ng_blocks)
+        init_weights(self.G_AB)
         self.G_BA = ResidualGenerator(nz, nc, ngf, norm_type, ng_blocks)
+        init_weights(self.G_BA)
         # Discriminators
         self.D_A = PatchDiscriminator(nc, ndf, nd_layers, norm_type)
+        init_weights(self.D_A)
         self.D_B = PatchDiscriminator(nc, ndf, nd_layers, norm_type)
+        init_weights(self.D_B)
         # Relay Buffer
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
