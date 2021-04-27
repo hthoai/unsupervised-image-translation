@@ -54,8 +54,11 @@ class UnalignedDataset(Dataset):
         # Transform
         real_A = self.transform(image=real_A.copy())
         real_B = self.transform(image=real_B.copy())
+        # To Tensor
+        real_A = self.to_tensor(real_A.astype(np.float32))
+        real_B = self.to_tensor(real_B.astype(np.float32))
 
-        return self.to_tensor(real_A), self.to_tensor(real_B)
+        return real_A, real_B
 
     def __len__(self) -> int:
         return max(len(self.files_A), len(self.files_B))
