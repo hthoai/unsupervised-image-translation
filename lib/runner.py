@@ -52,7 +52,9 @@ class Runner:
         if self.resume:
             model = self.exp.load_last_train_state(model)
         max_epochs = self.cfg["epochs"]
-        train_loader = self.get_data_loader(split="train", batch_size=8)
+        train_loader = self.get_data_loader(
+            split="train", batch_size=self.cfg["batch_size"]
+        )
 
         for epoch in trange(
             starting_epoch, max_epochs + 1, initial=starting_epoch, total=max_epochs
@@ -66,10 +68,7 @@ class Runner:
                 real_A = real_A.to(self.device)
                 real_B = real_B.to(self.device)
                 # Forward, backward, and optimize params
-                losses = model.optimize_params(real_A, real_B)
-                # Update learning rate
-                for scheduler in model.schedulers:
-                    scheduler.step()
+                losses, domain_A, domain_B = model.optimize_params(real_A, real_B)
 
                 # Log to progressing bar
                 postfix_dict = {key: float(value) for key, value in losses.items()}
@@ -78,23 +77,30 @@ class Runner:
                     epoch, max_epochs, idx, len(train_loader), postfix_dict
                 )
                 pbar.set_postfix(ordered_dict=postfix_dict)
-
                 self.iters += 1
-                # val step here
+                # Log image to tensorboard:
+                if self.iters % self.cfg["log_image_interval"] == 0:
+                    self.exp.log_image_and_hist_callback(
+                        domain_A, domain_B, epoch, idx, len(train_loader)
+                    )
+                # TO-DO val step here
 
+            # Update learning rate
+            for scheduler in model.schedulers:
+                scheduler.step()
             self.exp.epoch_end_callback(epoch, max_epochs, model)
 
         self.exp.train_end_callback()
 
     def get_model(self, **kwargs) -> Any:
-        name = self.config["model"]["name"]
-        parameters = self.config["model"]["parameters"]
+        name = self.cfg["model"]["name"]
+        parameters = self.cfg["model"]["parameters"]
         return getattr(models, name)(**parameters, **kwargs)
 
     def get_data_loader(
         self,
         split: str,
-        batch_size: int = 8,
+        batch_size: int = 1,
         shuffle: bool = False,
     ) -> DataLoader:
         """Returns torch.utils.data.DataLoader for custom dataset."""
