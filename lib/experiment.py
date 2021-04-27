@@ -9,6 +9,7 @@ from collections import OrderedDict
 from lib.config import Config
 
 import torch
+import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -108,33 +109,93 @@ class Experiment:
 
         return model
 
-    def save_train_state(self, epoch: int, model: Any, optimizer: Any) -> None:
+    def save_train_state(self, epoch: int, model: Any) -> None:
         train_state_path = self.get_checkpoint_path(epoch)
         torch.save(
-            {
-                "epoch": epoch,
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                # "scheduler": scheduler.state_dict(),
-            },
+            {"epoch": epoch, "model": model.state_dict()},
             train_state_path,
         )
 
     def iter_end_callback(
         self, epoch: int, max_epochs: int, iter_nb: int, max_iter: int, losses: Dict
     ) -> None:
-        line = "Epoch [{}/{}] - Iter [{}/{}] - Loss: {:.5f} - ".format(
+        line = "Epoch [{}/{}] - Iter [{}/{}] - ".format(
             epoch, max_epochs, iter_nb, max_iter
         )
         line += " - ".join(
             ["{}: {:.5f}".format(component, losses[component]) for component in losses]
         )
         self.logger.debug(line)
-        overall_iter = (epoch * max_iter) + iter_nb
+        overall_iter = ((epoch - 1) * max_iter) + iter_nb
         for key in losses:
-            self.tensorboard_writer.add_scalar(
-                "loss/{}".format(key), losses[key], overall_iter
-            )
+            if key != "lr":
+                self.tensorboard_writer.add_scalar(
+                    "loss/{}".format(key), losses[key], overall_iter
+                )
+            else:
+                self.tensorboard_writer.add_scalar("lr", losses[key], overall_iter)
+
+    def log_image_and_hist_callback(
+        self, domain_A: Dict, domain_B: Dict, epoch, iter_nb, max_iter
+    ) -> None:
+        assert self.cfg["num_image_log"] <= self.cfg["batch_size"]
+        overall_iter = ((epoch - 1) * max_iter) + iter_nb
+        n_imgs = self.cfg["num_image_log"]
+        img_shape = domain_A["real"].data[0].shape
+        ############################
+        # Domain A
+        ############################
+        images_A = torch.stack(
+            (
+                domain_A["real"].data[:n_imgs],
+                domain_A["fake"].data[:n_imgs],
+                domain_A["rec"].data[:n_imgs],
+            ),
+            dim=1,
+        ).view(len(domain_A) * n_imgs, img_shape[0], img_shape[1], img_shape[2])
+        # Write to tensorboard
+        ## Image
+        self.tensorboard_writer.add_image(
+            self.cfg["task"][0] + " (real | fake | rec)",
+            vutils.make_grid(
+                images_A, nrow=len(domain_A), normalize=True, scale_each=True
+            ),
+            overall_iter,
+        )
+        ## Histogram
+        self.tensorboard_writer.add_histogram(
+            self.cfg["task"][0] + "/real", domain_A["real"].data[0], overall_iter
+        )
+        self.tensorboard_writer.add_histogram(
+            self.cfg["task"][0] + "/fake", domain_A["fake"].data[0], overall_iter
+        )
+        ############################
+        # Domain B
+        ############################
+        images_B = torch.stack(
+            (
+                domain_B["real"].data[:n_imgs],
+                domain_B["fake"].data[:n_imgs],
+                domain_B["rec"].data[:n_imgs],
+            ),
+            dim=1,
+        ).view(len(domain_B) * n_imgs, img_shape[0], img_shape[1], img_shape[2])
+        # Write to tensorboard
+        ## Image
+        self.tensorboard_writer.add_image(
+            self.cfg["task"][1] + " (real | fake | rec)",
+            vutils.make_grid(
+                images_B, nrow=len(domain_B), normalize=True, scale_each=True
+            ),
+            overall_iter,
+        )
+        ## Histogram
+        self.tensorboard_writer.add_histogram(
+            self.cfg["task"][1] + "/real", domain_B["real"].data[0], overall_iter
+        )
+        self.tensorboard_writer.add_histogram(
+            self.cfg["task"][1] + "/fake", domain_B["fake"].data[0], overall_iter
+        )
 
     def epoch_start_callback(self, epoch: int, max_epochs: int) -> None:
         self.logger.debug(f"Epoch [{epoch}/{max_epochs}] starting.")
