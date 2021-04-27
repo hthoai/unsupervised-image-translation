@@ -1,8 +1,10 @@
 # Model settings
 model_checkpoint_interval: 5 # epochs
-save_result_interval: 400 # iters
+log_image_interval: 100 # iters
+num_image_log: 4
+task: ["clear2snowy", "snowy2clear"]
 seed: 21
-batch_size: 1 # size of a training mini-batch
+batch_size: 4 # size of a training mini-batch
 epochs: 200 # number of training epochs
 decay_epoch: 100 # epoch to start linearly decaying the learning rate to 0
 model:
