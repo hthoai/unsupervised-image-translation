@@ -1,10 +1,10 @@
 # Model settings
 model_checkpoint_interval: 5 # epochs
 log_image_interval: 100 # iters
-num_image_log: 4
-task: ["clear2snowy", "snowy2clear"]
+num_image_log: 1
+task: ["summer2winter", "winter2summer"]
 seed: 21
-batch_size: 4 # size of a training mini-batch
+batch_size: 1 # size of a training mini-batch
 epochs: 200 # number of training epochs
 decay_epoch: 100 # epoch to start linearly decaying the learning rate to 0
 model:
@@ -14,9 +14,9 @@ model:
     nz: 3 # size of z latent vector
     ngf: 64 # size of feature maps in generator
     ndf: 64 # size of feature maps in discriminator
-    ng_blocks: 6 # the number of Residual blocks
-    nd_layers: 6 # the number of conv layers in the discriminator
-    norm_type: batch # normalization layer `batch` | `instance`
+    ng_blocks: 9 # the number of Residual blocks
+    nd_layers: 3 # the number of conv layers in the discriminator
+    norm_type: instance # normalization layer `batch` | `instance`
     lambda_A: 10. # forward cycle loss weight
     lambda_B: 10. # backward cycle loss weight
     lambda_idt: 0.5 # identity loss weight
@@ -50,14 +50,16 @@ datasets:
   train:
     name: UnalignedDataset
     parameters:
-      root: "datasets/clear2snowy/train"
+      root: "datasets/summer2winter/train"
       img_size: [256, 256]
-      normalize: True
-      transforms:
-        - name: HorizontalFlip
+      transformations:
+        - name: RandomCrop
+          parameters:
+            size: 256
+        - name: RandomHorizontalFlip
           parameters:
             p: 0.5
-        - name: Crop
+        - name: Normalize
           parameters:
-            percent: !!python/tuple [0, 0.1]
-      transform_rate: 0.5
+            mean: !!python/tuple [0.5, 0.5, 0.5]
+            std: !!python/tuple [0.5, 0.5, 0.5]
