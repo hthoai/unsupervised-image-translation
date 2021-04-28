@@ -71,23 +71,26 @@ class Runner:
                 losses, domain_A, domain_B = model.optimize_params(real_A, real_B)
 
                 # Log to progressing bar
-                postfix_dict = {key: float(value) for key, value in losses.items()}
-                postfix_dict["lr"] = model.optimizers[0].param_groups[0]["lr"]
+                loss_components = losses["A"] | losses["B"]
+                postfix_dict = {
+                    key: float(value) for key, value in loss_components.items()
+                }
+                lr = model.optimizers["G"].param_groups[0]["lr"]
                 self.exp.iter_end_callback(
-                    epoch, max_epochs, idx, len(train_loader), postfix_dict
+                    epoch, max_epochs, idx, len(train_loader), losses, lr
                 )
                 pbar.set_postfix(ordered_dict=postfix_dict)
                 self.iters += 1
                 # Log image to tensorboard:
                 if self.iters % self.cfg["log_image_interval"] == 0:
                     self.exp.log_image_and_hist_callback(
-                        domain_A, domain_B, epoch, idx, len(train_loader)
+                        model, domain_A, domain_B, epoch, idx, len(train_loader)
                     )
                 # TO-DO val step here
 
             # Update learning rate
-            for scheduler in model.schedulers:
-                scheduler.step()
+            for scheduler in model.schedulers.keys():
+                model.schedulers[scheduler].step()
             self.exp.epoch_end_callback(epoch, max_epochs, model)
 
         self.exp.train_end_callback()

@@ -117,26 +117,34 @@ class Experiment:
         )
 
     def iter_end_callback(
-        self, epoch: int, max_epochs: int, iter_nb: int, max_iter: int, losses: Dict
+        self,
+        epoch: int,
+        max_epochs: int,
+        iter_nb: int,
+        max_iter: int,
+        losses: Dict,
+        lr: float,
     ) -> None:
         line = "Epoch [{}/{}] - Iter [{}/{}] - ".format(
             epoch, max_epochs, iter_nb, max_iter
         )
-        line += " - ".join(
-            ["{}: {:.5f}".format(component, losses[component]) for component in losses]
-        )
+        for key in losses:
+            line += " - ".join(
+                [
+                    "{}: {:.5f}".format(component, losses[key][component])
+                    for component in losses[key]
+                ]
+            )
         self.logger.debug(line)
         overall_iter = ((epoch - 1) * max_iter) + iter_nb
         for key in losses:
-            if key != "lr":
-                self.tensorboard_writer.add_scalar(
-                    "loss/{}".format(key), losses[key], overall_iter
-                )
-            else:
-                self.tensorboard_writer.add_scalar("lr", losses[key], overall_iter)
+            self.tensorboard_writer.add_scalars(
+                "loss/{}".format(key), losses[key], overall_iter
+            )
+        self.tensorboard_writer.add_scalar("lr", lr, overall_iter)
 
     def log_image_and_hist_callback(
-        self, domain_A: Dict, domain_B: Dict, epoch, iter_nb, max_iter
+        self, model: Any, domain_A: Dict, domain_B: Dict, epoch, iter_nb, max_iter
     ) -> None:
         assert self.cfg["num_image_log"] <= self.cfg["batch_size"]
         overall_iter = ((epoch - 1) * max_iter) + iter_nb
@@ -150,13 +158,14 @@ class Experiment:
                 domain_A["real"].data[:n_imgs],
                 domain_A["fake"].data[:n_imgs],
                 domain_A["rec"].data[:n_imgs],
+                domain_A["idt"].data[:n_imgs],
             ),
             dim=1,
         ).view(len(domain_A) * n_imgs, img_shape[0], img_shape[1], img_shape[2])
         # Write to tensorboard
         ## Image
         self.tensorboard_writer.add_image(
-            self.cfg["task"][0] + " (real | fake | rec)",
+            self.cfg["task"][0] + " (real | fake | rec | idt)",
             vutils.make_grid(
                 images_A, nrow=len(domain_A), normalize=True, scale_each=True
             ),
@@ -164,10 +173,10 @@ class Experiment:
         )
         ## Histogram
         self.tensorboard_writer.add_histogram(
-            self.cfg["task"][0] + "/real", domain_A["real"].data[0], overall_iter
+            self.cfg["task"][0] + "/real", model.D_A(domain_A["real"]), overall_iter
         )
         self.tensorboard_writer.add_histogram(
-            self.cfg["task"][0] + "/fake", domain_A["fake"].data[0], overall_iter
+            self.cfg["task"][0] + "/fake", model.D_A(domain_A["fake"]), overall_iter
         )
         ############################
         # Domain B
@@ -177,13 +186,14 @@ class Experiment:
                 domain_B["real"].data[:n_imgs],
                 domain_B["fake"].data[:n_imgs],
                 domain_B["rec"].data[:n_imgs],
+                domain_B["idt"].data[:n_imgs],
             ),
             dim=1,
         ).view(len(domain_B) * n_imgs, img_shape[0], img_shape[1], img_shape[2])
         # Write to tensorboard
         ## Image
         self.tensorboard_writer.add_image(
-            self.cfg["task"][1] + " (real | fake | rec)",
+            self.cfg["task"][1] + " (real | fake | rec | idt)",
             vutils.make_grid(
                 images_B, nrow=len(domain_B), normalize=True, scale_each=True
             ),
@@ -191,10 +201,10 @@ class Experiment:
         )
         ## Histogram
         self.tensorboard_writer.add_histogram(
-            self.cfg["task"][1] + "/real", domain_B["real"].data[0], overall_iter
+            self.cfg["task"][1] + "/real", model.D_B(domain_B["real"]), overall_iter
         )
         self.tensorboard_writer.add_histogram(
-            self.cfg["task"][1] + "/fake", domain_B["fake"].data[0], overall_iter
+            self.cfg["task"][1] + "/fake", model.D_B(domain_B["fake"]), overall_iter
         )
 
     def epoch_start_callback(self, epoch: int, max_epochs: int) -> None:
