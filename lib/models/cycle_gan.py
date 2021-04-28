@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 import itertools
 
 import torch
@@ -54,22 +54,19 @@ class CycleGAN(nn.Module):
         self.D_B = PatchDiscriminator(nc, ndf, nd_layers, norm_type)
         init_weights(self.D_B)
         # Relay Buffer
-        self.fake_A_buffer = ReplayBuffer()
-        self.fake_B_buffer = ReplayBuffer()
+        self.replay_buffer = {"fake_A": ReplayBuffer(), "fake_B": ReplayBuffer()}
         # Optimizers
         self.optimizers = []
         # Schedulers
         self.schedulers = []
         # Criterions
-        self.gan_criterion = None
-        self.cycle_criterion = None
-        self.idt_criterion = None
+        self.criterions = {"gan": None, "cycle": None, "idt": None}
         # Loss weights
-        self.lambda_A = lambda_A
-        self.lambda_B = lambda_B
-        self.lambda_identity = lambda_idt
+        self.lambdas = {"A": lambda_A, "B": lambda_B, "idt": lambda_idt}
 
-    def optimize_params(self, real_A: Tensor, real_B: Tensor) -> Dict:
+    def optimize_params(
+        self, real_A: Tensor, real_B: Tensor
+    ) -> Tuple[Dict, Dict, Dict]:
         """Forward, backward, and optimize parameters.
 
         Parameters:
@@ -79,7 +76,9 @@ class CycleGAN(nn.Module):
 
         Returns:
         --------
-            losses: {loss_G, loss_D, loss_cycle, loss_idt}
+            losses:   {loss_G, loss_D, loss_cycle, loss_idt}
+            domain_A: {real, fake, rec, idt}
+            domain_B: {real, fake, rec, idt}
         """
         ############################
         # (I) Update G networks
@@ -89,26 +88,30 @@ class CycleGAN(nn.Module):
         ## 1a) Translation
         fake_A = self.G_BA(real_B)
         fake_B = self.G_AB(real_A)
-        ## 1b) Loss translation
-        pred_fake_A = self.D_A(fake_A).view(-1)
-        loss_gan_BA = self.gan_criterion(pred_fake_A, torch.zeros_like(pred_fake_A))
-        pred_fake_B = self.D_B(fake_B).view(-1)
-        loss_gan_AB = self.gan_criterion(pred_fake_B, torch.zeros_like(pred_fake_B))
+        ## 1b) Translation loss
+        DA_fake_B = self.D_A(fake_B)
+        loss_gan_AB = self.criterions["gan"](DA_fake_B, torch.ones_like(DA_fake_B))
+        DB_fake_A = self.D_B(fake_A)
+        loss_gan_BA = self.criterions["gan"](DB_fake_A, torch.ones_like(DB_fake_A))
         ## 2a) Back translation
         rec_A = self.G_BA(fake_B)
         rec_B = self.G_AB(fake_A)
-        ## 2b) Loss cycle
-        loss_cycle_A = self.cycle_criterion(rec_A, real_A) * self.lambda_A
-        loss_cycle_B = self.cycle_criterion(rec_B, real_B) * self.lambda_B
-        ## 3a) Reconciliation
-        rec_A = self.G_AB(real_A)
-        rec_B = self.G_BA(real_B)
-        ## 3b) Loss identity
+        ## 2b) Back translation (cycle) loss
+        loss_cycle_A = self.criterions["cycle"](rec_A, real_A) * self.lambdas["A"]
+        loss_cycle_B = self.criterions["cycle"](rec_B, real_B) * self.lambdas["B"]
+        ## 3a) Reconciliation (identity)
+        idt_A = self.G_AB(real_B)
+        idt_B = self.G_BA(real_A)
+        ## 3b) Reconciliation (identity) loss
         loss_idt_A = (
-            self.idt_criterion(real_A, rec_A) * self.lambda_A * self.lambda_identity
+            self.criterions["idt"](idt_A, real_B)
+            * self.lambdas["A"]
+            * self.lambdas["idt"]
         )
         loss_idt_B = (
-            self.idt_criterion(real_B, rec_B) * self.lambda_B * self.lambda_identity
+            self.criterions["idt"](idt_B, real_A)
+            * self.lambdas["B"]
+            * self.lambdas["idt"]
         )
         ## 4 Combine losses and calculate grads
         loss_G = (
@@ -127,35 +130,36 @@ class CycleGAN(nn.Module):
         ############################
         self.optimizers[1].zero_grad()
         self.set_requires_grad([self.D_A, self.D_B], True)
-        ## 1a) Loss D_A
-        fake_A = self.fake_A_buffer(fake_A)
+        ## D_A
+        ### 1a) Loss D_A
+        fake_A = self.replay_buffer["fake_A"](fake_A)
         pred_fake_A = self.D_A(fake_A)
-        loss_fake_A = self.gan_criterion(pred_fake_A, torch.zeros_like(pred_fake_A))
+        loss_fake_A = self.criterions["gan"](pred_fake_A, torch.zeros_like(pred_fake_A))
         pred_real_A = self.D_A(real_A)
-        loss_real_A = self.gan_criterion(pred_real_A, torch.ones_like(pred_real_A))
-        ## 1b) Loss D_B
-        fake_B = self.fake_B_buffer(fake_B)
-        pred_fake_B = self.D_A(fake_B)
-        loss_fake_B = self.gan_criterion(pred_fake_B, torch.zeros_like(pred_fake_B))
-        pred_real_B = self.D_A(real_B)
-        loss_real_B = self.gan_criterion(pred_real_B, torch.ones_like(pred_real_B))
-        ## 2 Combine loss and calculate grads
-        loss_D = (loss_fake_A + loss_real_A + loss_fake_B + loss_real_B) * 0.5
-        loss_D.backward()
-        ## 5 Update Ds' weights
+        loss_real_A = self.criterions["gan"](pred_real_A, torch.ones_like(pred_real_A))
+        ### 1b) Backward D_A
+        loss_DA = (loss_fake_A + loss_real_A) * 0.5
+        loss_DA.backward()
+        ## D_B
+        ### 2a) Loss D_B
+        fake_B = self.replay_buffer["fake_B"](fake_B)
+        pred_fake_B = self.D_B(fake_B)
+        loss_fake_B = self.criterions["gan"](pred_fake_B, torch.zeros_like(pred_fake_B))
+        pred_real_B = self.D_B(real_B)
+        loss_real_B = self.criterions["gan"](pred_real_B, torch.ones_like(pred_real_B))
+        ### 2b) Backward D_B
+        loss_DB = (loss_fake_B + loss_real_B) * 0.5
+        loss_DB.backward()
+        ## 3 Update Ds' weights
         self.optimizers[1].step()
 
         # Save for logging
-        domain_A = {"real": real_A, "fake": fake_A, "rec": rec_A}
-        domain_B = {"real": real_B, "fake": fake_B, "rec": rec_B}
-
-        
+        domain_A = {"real": real_A, "fake": fake_A, "rec": rec_A, "idt": idt_A}
+        domain_B = {"real": real_B, "fake": fake_B, "rec": rec_B, "idt": idt_B}
 
         losses = {
-            "G": loss_G,
-            "D": loss_D,
-            "cycle": loss_cycle_A + loss_cycle_B,
-            "idt": loss_idt_A + loss_idt_B,
+            "A": {"G": (loss_gan_AB + loss_cycle_A + loss_idt_A) / 3, "D": loss_DA},
+            "B": {"G": (loss_gan_BA + loss_cycle_B + loss_idt_B) / 3, "D": loss_DB},
         }
 
         return losses, domain_A, domain_B
@@ -184,13 +188,13 @@ class CycleGAN(nn.Module):
             )
 
     def set_criterions(self, cfgs: Any) -> None:
-        self.gan_criterion = getattr(torch.nn, cfgs["criterion"]["gan"]["name"])(
+        self.criterions["gan"] = getattr(torch.nn, cfgs["criterion"]["gan"]["name"])(
             **cfgs["criterion"]["gan"]["parameters"]
         )
-        self.cycle_criterion = getattr(torch.nn, cfgs["criterion"]["cycle"]["name"])(
-            **cfgs["criterion"]["cycle"]["parameters"]
-        )
-        self.idt_criterion = getattr(torch.nn, cfgs["criterion"]["idt"]["name"])(
+        self.criterions["cycle"] = getattr(
+            torch.nn, cfgs["criterion"]["cycle"]["name"]
+        )(**cfgs["criterion"]["cycle"]["parameters"])
+        self.criterions["idt"] = getattr(torch.nn, cfgs["criterion"]["idt"]["name"])(
             **cfgs["criterion"]["idt"]["parameters"]
         )
 
