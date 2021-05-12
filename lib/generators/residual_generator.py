@@ -6,9 +6,9 @@ from lib.layers import ConvNormRelu, ResidualBlock
 
 class ResidualGenerator(nn.Module):
     """Resnet-based generator that consists of Residual blocks
-    between a few downsampling/upsampling operations
-    adapted Torch code and idea from Justin Johnson's neural style transfer project
-    https://github.com/jcjohnson/fast-neural-style"""
+    between a few downsampling/upsampling operations.
+    
+    Adapted from https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix"""
 
     def __init__(
         self,
@@ -17,22 +17,26 @@ class ResidualGenerator(nn.Module):
         ngf: int = 64,
         norm_type: str="batch",
         ng_blocks: int = 6,
-    ) -> None:
+        n_downsampling: int = 2
+    ):
         """Construct a Resnet-based Generator.
 
         Parameters:
         -----------
-            nz:          size of z latent vector
-            nc:          the number of channels in output images
-            ngf:         size of feature maps in generator
-            norm_type:   normalization layer `batch` | `instance`
-            n_blocks:    the number of Residual blocks
+            nz:             size of z latent vector
+            nc:             the number of channels in output images
+            ngf:            size of feature maps in generator
+            norm_type:      normalization layer `batch` | `instance`
+            n_blocks:       the number of Residual blocks
+            n_downsampling: the number of encoder/decoder blocks
         """
         assert (ng_blocks >= 0)
         super(ResidualGenerator, self).__init__()
         # No need to use bias as BatchNorm2d has affine parameters
-        use_bias = norm_type == "batch"
-        # ENCODING
+        bias = norm_type == "batch"
+        ############################
+        # ENCODER
+        ############################
         encoder = [nn.ReflectionPad2d(3)]
         encoder += [
             ConvNormRelu(
@@ -41,10 +45,9 @@ class ResidualGenerator(nn.Module):
                 conv_type="forward",
                 norm_type=norm_type,
                 kernel_size=7,
-                use_bias=use_bias,
+                bias=bias,
             )
         ]
-        n_downsampling = 2
         for i in range(n_downsampling):
             mult = 2 ** i
             encoder += [
@@ -55,18 +58,22 @@ class ResidualGenerator(nn.Module):
                     norm_type=norm_type,
                     kernel_size=3,
                     stride=2,
-                    pad_size=1,
-                    use_bias=use_bias,
+                    padding=1,
+                    bias=bias,
                 )
             ]
         self.encoder = nn.Sequential(*encoder)
+        ############################
         # TRANSFORMATION
+        ############################
         mult = 2 ** n_downsampling
         resblocks = []
         for i in range(ng_blocks):
-            resblocks += [ResidualBlock(ngf * mult, norm_type, use_bias)]
+            resblocks += [ResidualBlock(ngf * mult, norm_type, bias)]
         self.transform = nn.Sequential(*resblocks)
-        # DECODING
+        ############################
+        # DECODER
+        ############################
         decoder = []
         for i in range(n_downsampling):
             mult = 2 ** (n_downsampling - i)
@@ -78,8 +85,8 @@ class ResidualGenerator(nn.Module):
                     norm_type=norm_type,
                     kernel_size=3,
                     stride=2,
-                    pad_size=1,
-                    use_bias=use_bias,
+                    padding=1,
+                    bias=bias,
                 )
             ]
         decoder += [
@@ -100,3 +107,4 @@ class ResidualGenerator(nn.Module):
         x = self.decoder(x)
 
         return x
+    

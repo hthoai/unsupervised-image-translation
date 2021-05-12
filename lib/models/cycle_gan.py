@@ -8,7 +8,8 @@ import torch.nn as nn
 from utils.replay_buffer import ReplayBuffer
 from utils.lambda_lr import LambdaLR
 from utils.init_weight import init_weights
-from lib.models import ResidualGenerator, PatchDiscriminator
+from lib.discriminators import PatchDiscriminator
+from lib.generators import ResidualGenerator
 
 
 class CycleGAN(nn.Module):

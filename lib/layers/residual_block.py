@@ -11,9 +11,9 @@ class ResidualBlock(nn.Module):
         self,
         dim: int,
         norm_type: str,
-        use_bias: bool = True,
+        bias: bool = True,
         leaky: float = 0,
-    ) -> None:
+    ):
         """Initialize the Residual Block
 
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
@@ -25,16 +25,17 @@ class ResidualBlock(nn.Module):
             kernel_size=3,
             padding=1,
             padding_mode="reflect",
-            bias=use_bias,
+            bias=bias,
         )
         self.norm = get_norm_layer(norm_type)(dim)
         if leaky > 0:
-            self.relu = nn.LeakyReLU(negative_slope=leaky)
+            self.relu = nn.LeakyReLU(negative_slope=leaky, inplace=True)
         else:
-            self.relu = nn.ReLU()
+            self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward function (with skip connections)"""
+
         out = self.conv(x)
         out = self.norm(x)
         out = self.relu(out)
