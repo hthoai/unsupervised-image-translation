@@ -46,8 +46,8 @@ class PatchDiscriminator(nn.Module):
                     norm_type=norm_type,
                     kernel_size=kernel_size,
                     stride=2,
-                    pad_size=padw,
-                    use_bias=use_bias,
+                    padding=padw,
+                    bias=use_bias,
                     leaky=0.2,
                 )
             ]
@@ -61,8 +61,8 @@ class PatchDiscriminator(nn.Module):
             norm_type=norm_type,
             kernel_size=kernel_size,
             stride=1,
-            pad_size=padw,
-            use_bias=use_bias,
+            padding=padw,
+            bias=use_bias,
             leaky=0.2,
         )
         self.output = nn.Conv2d(

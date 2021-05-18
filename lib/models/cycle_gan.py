@@ -23,6 +23,7 @@ class CycleGAN(nn.Module):
         ndf: int,
         ng_blocks: int,
         nd_layers: int,
+        ksize_d: int,
         norm_type: str,
         lambda_A: float,
         lambda_B: float,
@@ -38,6 +39,7 @@ class CycleGAN(nn.Module):
             ndf:         size of feature maps in discriminator
             ng_blocks:   the number of Residual blocks
             nd_layers:   the number of conv layers in the discriminator
+            ksize_d:        kernel size of conv layer in the discriminator
             norm_type:   normalization layer type `batch` | `instance`
             lambda_A:    forward cycle loss weight
             lambda_B:    backward cycle loss weight
@@ -50,9 +52,9 @@ class CycleGAN(nn.Module):
         self.G_BA = ResidualGenerator(nz, nc, ngf, norm_type, ng_blocks)
         init_weights(self.G_BA)
         # Discriminators
-        self.D_A = PatchDiscriminator(nc, ndf, nd_layers, norm_type)
+        self.D_A = PatchDiscriminator(nc, ksize_d, ndf, nd_layers, norm_type)
         init_weights(self.D_A)
-        self.D_B = PatchDiscriminator(nc, ndf, nd_layers, norm_type)
+        self.D_B = PatchDiscriminator(nc, ksize_d, ndf, nd_layers, norm_type)
         init_weights(self.D_B)
         # Relay Buffer
         self.replay_buffer = {"fake_A": ReplayBuffer(), "fake_B": ReplayBuffer()}
