@@ -5,6 +5,11 @@ import torch.nn as nn
 
 
 def get_norm_layer(norm_type: str) -> nn:
+    """Get normalization layer.
+    BatchNorm2d:    `affine=True`
+    InstanceNorm2d: `affine=False`
+    """
+
     if norm_type == "batch":
         norm_layer =  functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':

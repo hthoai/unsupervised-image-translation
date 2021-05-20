@@ -9,23 +9,20 @@ from torch.functional import Tensor
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
-IMAGENET_MEAN = np.array([0.5, 0.5, 0.5])  # np.array([0.485, 0.456, 0.406])
-IMAGENET_STD = np.array([0.5, 0.5, 0.5])  # np.array([0.229, 0.224, 0.225])
-
 
 class UnalignedDataset(Dataset):
     """Ref: https://github.com/Lornatang/CycleGAN-PyTorch"""
 
     def __init__(self, root: str, img_size: List, transformations: Any = None) -> None:
-        transforms_list = [
-            transforms.ToTensor(),
-            transforms.Resize(size=img_size, interpolation=Image.BICUBIC),
-        ]
+        transforms_list = [transforms.ToTensor()]
         if transformations is not None:
             transforms_list += [
                 getattr(transforms, trans["name"])(**trans["parameters"])
                 for trans in transformations
             ]
+        transforms_list += [
+            transforms.Resize(size=img_size, interpolation=Image.BICUBIC)
+        ]
         self.transform = transforms.Compose(transforms_list)
         self.files_A = sorted(glob.glob(root + "A/*.*"))
         self.files_B = sorted(glob.glob(root + "B/*.*"))
