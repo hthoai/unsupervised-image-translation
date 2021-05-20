@@ -56,10 +56,23 @@ datasets:
       transformations:
         - name: RandomCrop
           parameters:
-            size: 256
+            size: 720
         - name: RandomHorizontalFlip
           parameters:
             p: 0.5
+        - name: Normalize
+          parameters:
+            mean: !!python/tuple [0.5, 0.5, 0.5]
+            std: !!python/tuple [0.5, 0.5, 0.5]
+  test:
+    name: UnalignedDataset
+    parameters:
+      root: "datasets/clear2snowy2/test"
+      img_size: [256, 256]
+      transformations:
+        - name: RandomCrop
+          parameters:
+            size: 720
         - name: Normalize
           parameters:
             mean: !!python/tuple [0.5, 0.5, 0.5]
